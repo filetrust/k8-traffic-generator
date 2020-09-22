@@ -22,12 +22,12 @@ logger = logging.getLogger('file processor')
 file_path = '/files/'
 rebuild_path = '/rebuild/'
 
-SRC_URL = os.getenv('SOURCE_MINIO_URL', 'http://192.168.99.120:30747')
+SRC_URL = os.getenv('SOURCE_MINIO_URL', 'http://192.168.99.123:32368')
 SRC_ACCESS_KEY = os.getenv('SOURCE_MINIO_ACCESS_KEY', 'test')
 SRC_SECRET_KEY = os.getenv('SOURCE_MINIO_SECRET_KEY', 'test@123')
 SRC_BUCKET = os.getenv('SOURCE_MINIO_BUCKET', 'input')
 
-TGT_URL = os.getenv('TARGET_MINIO_URL', 'http://192.168.99.120:31555')
+TGT_URL = os.getenv('TARGET_MINIO_URL', 'http://192.168.99.123:30493')
 TGT_ACCESS_KEY = os.getenv('TARGET_MINIO_ACCESS_KEY', 'test')
 TGT_SECRET_KEY = os.getenv('TARGET_MINIO_SECRET_KEY', 'test@123')
 TGT_BUCKET = os.getenv('TARGET_MINIO_BUCKET', 'output')
@@ -36,6 +36,8 @@ LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
 
 jwt_token = os.getenv("API_TOKEN","YOUR_REBUILD_API_TOKEN")
 url = os.getenv("API_URL","https://gzlhbtpvk2.execute-api.eu-west-1.amazonaws.com/Prod/api/rebuild/file")
+
+FILE_TO_PROCESS = os.getenv("FILE_TO_PROCESS", "Reports 1.pdf")
 
 SHELL_ACCESS = False
 
@@ -56,14 +58,15 @@ class Main():
                 logger.info('Bucket {} not found.'.format(SRC_BUCKET))
                 return
             bucket = s3.Bucket(SRC_BUCKET)
-            for file in bucket.objects.all():
+
+            #for file in bucket.objects.all():
+            for file in bucket.objects.filter(Prefix=FILE_TO_PROCESS):
                 path, filename = os.path.split(file.key)
                 obj_file = file_path + filename
                 logger.info('Downloading file {}.'.format(filename))
                 bucket.download_file(file.key, obj_file)
                 Main.rebuild_it(file_path, filename)
                 Main.upload_to_minio(rebuild_path, filename)
-                #Main.upload_to_minio(file_path, filename)
                 file.delete()
                 # we only are intrested in processing the first file if it exists
                 break

@@ -152,7 +152,9 @@ class Main():
 
         job_name = FILE_PROCESSOR
 
-        envs = [client.V1EnvVar(name="API_TOKEN", value=os.getenv("API_TOKEN"))]
+        envs = [client.V1EnvVar(name="API_TOKEN", value=os.getenv("API_TOKEN")),
+                client.V1EnvVar(name="FILE_TO_PROCESS", value=os.getenv("FILE_TO_PROCESS", "Reports 2.pdf"))
+               ]
 
         processor_container = client.V1Container(
             name="processor",
@@ -190,8 +192,8 @@ class Main():
     def application():
 
         # No Loop debug run
-        #Main.run_processor()
-        #return
+        Main.run_processor()
+        return
      
         while True:
             try:
