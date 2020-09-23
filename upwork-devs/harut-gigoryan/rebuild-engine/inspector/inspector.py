@@ -6,6 +6,10 @@ from datetime import datetime;
 import requests
 import time
 
+import boto3
+from botocore.client import Config
+from botocore.exceptions import ClientError
+
 from kubernetes import client, config, utils
 import kubernetes.client
 from kubernetes.client.rest import ApiException
@@ -21,7 +25,12 @@ logging.config.fileConfig('logging.conf')
 logger = logging.getLogger('inspector')
 
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
-FILE_PROCESSOR = "file-processor"
+FILE_PROCESSOR = "file-processor-"
+
+SRC_URL = os.getenv('SOURCE_MINIO_URL', 'http://192.168.99.123:32368')
+SRC_ACCESS_KEY = os.getenv('SOURCE_MINIO_ACCESS_KEY', 'test')
+SRC_SECRET_KEY = os.getenv('SOURCE_MINIO_SECRET_KEY', 'test@123')
+SRC_BUCKET = os.getenv('SOURCE_MINIO_BUCKET', 'input')
 
 # Setup K8 configs
 config.load_kube_config()
@@ -138,22 +147,20 @@ def kube_processor_jobs_running(namespace='default', state='Finished'):
 
 class Main():
 
+    job_counter = 0
+
     @staticmethod
     def log_level(level):
         logging.basicConfig(level=getattr(logging, level))
 
     @staticmethod
-    def run_processor():
+    def run_processor(file_name):
 
-        while kube_processor_jobs_running():
-            logger.debug("Previous job still running")
-            kube_cleanup_finished_jobs()
-            time.sleep(1)
-
-        job_name = FILE_PROCESSOR
+        Main.job_counter = Main.job_counter + 1
+        job_name = FILE_PROCESSOR + str(Main.job_counter)
 
         envs = [client.V1EnvVar(name="API_TOKEN", value=os.getenv("API_TOKEN")),
-                client.V1EnvVar(name="FILE_TO_PROCESS", value=os.getenv("FILE_TO_PROCESS", "Reports 2.pdf"))
+                client.V1EnvVar(name="FILE_TO_PROCESS", value=file_name)
                ]
 
         processor_container = client.V1Container(
@@ -189,15 +196,42 @@ class Main():
             namespace="default")
 
     @staticmethod
+    def process_files():
+        try:
+            s3 = boto3.resource('s3', endpoint_url=SRC_URL, aws_access_key_id=SRC_ACCESS_KEY,
+                                aws_secret_access_key=SRC_SECRET_KEY, config=Config(signature_version='s3v4'))
+            logger.debug('Check if the Bucket {} exists'.format(SRC_BUCKET))
+            if (s3.Bucket(SRC_BUCKET) in s3.buckets.all()) == False:
+                logger.info('Bucket {} not found.'.format(SRC_BUCKET))
+                return
+            bucket = s3.Bucket(SRC_BUCKET)
+
+            for file in bucket.objects.all():
+                path, filename = os.path.split(file.key)
+                Main.run_processor(filename)
+
+        except ClientError as e:
+            logger.error("Cannot Connect to the Minio {}. Please Verify your credentials.".format(URL))
+        except Exception as e:
+            logger.error(e)
+
+
+    @staticmethod
     def application():
 
         # No Loop debug run
-        Main.run_processor()
-        return
+        #Main.run_processor("Reports 2.pdf")
+        #return
      
         while True:
+            # clean up old jobs
+            while kube_processor_jobs_running():
+                kube_cleanup_finished_jobs()
+                logger.debug("Previous jobs still running")
+                time.sleep(0.01)
+
             try:
-                Main.run_processor()
+                Main.process_files()
             except Exception as e:
                 logger.error(e)
 
