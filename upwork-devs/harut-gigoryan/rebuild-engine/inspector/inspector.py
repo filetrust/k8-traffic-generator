@@ -14,6 +14,8 @@ from kubernetes import client, config, utils
 import kubernetes.client
 from kubernetes.client.rest import ApiException
 
+import threading
+
 class ElkJsonFormatter(jsonlogger.JsonFormatter):
     def add_fields(self, log_record, record, message_dict):
         super(ElkJsonFormatter, self).add_fields(log_record, record, message_dict)
@@ -121,6 +123,7 @@ def kube_cleanup_finished_jobs(namespace='default', state='Finished'):
     
     # Now that we have the jobs cleaned, let's clean the pods
     kube_delete_empty_pods(namespace)
+    #kube_delete_empty_pods(namespace, 'Pending')
     # And we are done!
     return
 
@@ -144,6 +147,10 @@ def kube_processor_jobs_running(namespace='default', state='Finished'):
     
     return False
 
+def cleanup_function():
+    if kube_processor_jobs_running():
+        kube_cleanup_finished_jobs()
+        time.sleep(1)
 
 class Main():
 
@@ -215,20 +222,22 @@ class Main():
         except Exception as e:
             logger.error(e)
 
-
     @staticmethod
     def application():
 
         # No Loop debug run
         #Main.run_processor("Reports 2.pdf")
         #return
+
+        #x = threading.Thread(target=cleanup_function, args=())
+        #x.start()
      
         while True:
             # clean up old jobs
             while kube_processor_jobs_running():
                 kube_cleanup_finished_jobs()
                 logger.debug("Previous jobs still running")
-                time.sleep(0.01)
+                time.sleep(1)
 
             try:
                 Main.process_files()
