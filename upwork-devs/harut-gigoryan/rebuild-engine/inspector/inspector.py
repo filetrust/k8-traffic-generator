@@ -172,7 +172,7 @@ class Main():
 
         processor_container = client.V1Container(
             name="processor",
-            image=os.getenv("PROCESSOR_IMAGE", "ggrig/k8-traffic:re_processor"),
+            image=os.getenv("PROCESSOR_IMAGE", "ggrig/k8-traffic:re"),
             env=envs)
 
         pod_spec = client.V1PodSpec(

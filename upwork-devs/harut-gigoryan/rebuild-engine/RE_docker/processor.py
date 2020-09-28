@@ -20,7 +20,7 @@ logging.config.fileConfig('logging.conf')
 logger = logging.getLogger('file processor')
 
 file_path = '/input/'
-rebuild_path = '/output/'
+rebuild_path = '/output/Managed/'
 
 SRC_URL = os.getenv('SOURCE_MINIO_URL', 'http://192.168.99.123:32368')
 SRC_ACCESS_KEY = os.getenv('SOURCE_MINIO_ACCESS_KEY', 'test')
@@ -66,7 +66,7 @@ class Main():
                 logger.info('Downloading file {}.'.format(filename))
                 bucket.download_file(file.key, obj_file)
                 Main.rebuild_it(file_path, filename)
-                Main.upload_to_minio(rebuild_path, filename)
+                Main.upload_to_minio(rebuild_path, filename + '.xml')
                 file.delete()
                 # we only are intrested in processing the first file if it exists
                 break
@@ -78,36 +78,7 @@ class Main():
 
     @staticmethod
     def rebuild_it(file_path, filename):
-        try:
-            logger.info('Rebuilding file {}.'.format(filename))
-
-            local_filename = file_path + filename
-            # Send a file to Glasswall's Rebuild API
-            with open(local_filename, "rb") as f:
-                response = requests.post(
-                    url=url,
-                    files=[("file", f)],
-                    headers={
-                        "Authorization": jwt_token,
-                        "accept": "application/octet-stream"
-                    }
-                )
-
-            output_file_path = rebuild_path + filename
-
-            if response.status_code == 200 and response.content:
-                # Glasswall has now sanitised and returned this file
-                # Write the sanitised file to output file path
-                logger.info("The file has been successfully rebuild")
-                with open(output_file_path, "wb") as f:
-                    f.write(response.content)
-            else:
-                # An error occurred, raise it
-                logger.error("Rebuild Failed: {}", format(response.raise_for_status()))
-
-        except Exception as e:
-            logger.error("Rebuild Failed with Exception")
-            logger.error(e)
+        os.system('glasswallCLI -config=/home/glasswall/Config.ini -xmlconfig=/home/glasswall/Config.xml')
 
     @staticmethod
     def upload_to_minio(file_path, filename):
