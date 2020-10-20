@@ -10,6 +10,6 @@
 ```
 ### Start minikube
 ```
-    minikube start --driver=virtualbox --cpus 3 memory 8192
+    minikube start --driver=virtualbox --cpus 3 --memory 8192
 ```
 ## Windows 10 (TBD)
